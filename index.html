@@ -409,9 +409,10 @@ nav{display:flex;flex-direction:column;gap:3px}
 </div>
 
 <script>
-var subjects = JSON.parse(localStorage.getItem('sp_subjects') || '[]');
-var sessions  = JSON.parse(localStorage.getItem('sp_sessions')  || '[]');
-var settings  = JSON.parse(localStorage.getItem('sp_settings')  || '{"dark":false,"focus":25,"short":5,"long":15}');
+var subjects, sessions, settings;
+try { subjects = JSON.parse(localStorage.getItem('sp_subjects') || '[]'); } catch(e) { subjects = []; localStorage.removeItem('sp_subjects'); }
+try { sessions = JSON.parse(localStorage.getItem('sp_sessions') || '[]'); } catch(e) { sessions = []; localStorage.removeItem('sp_sessions'); }
+try { settings = JSON.parse(localStorage.getItem('sp_settings') || '{"dark":false,"focus":25,"short":5,"long":15}'); } catch(e) { settings = {"dark":false,"focus":25,"short":5,"long":15}; }
 
 var timerRunning = false;
 var timerInterval = null;
@@ -1095,3 +1096,40 @@ async function canvasFetch(canvasPath) {
     }
   }
   return allResults;
+}
+
+async function canvasFetchSafe(canvasPath) {
+  var token = getToken();
+  var parts = canvasPath.split('?');
+  var pathOnly = parts[0];
+  var qs = parts[1] ? '&' + parts[1] : '';
+  var proxyUrl = '/api/canvas?path=' + encodeURIComponent(pathOnly) + '&per_page=50' + qs;
+  // Proxy handles timeout server-side and returns [] on abort — no client hang
+  var res = await fetch(proxyUrl, { headers: { 'Authorization': 'Bearer ' + token } });
+  if(res.status === 401) throw new Error('Invalid token — check Settings');
+  var data = await res.json();
+  if(data && data.error) throw new Error(data.error);
+  return Array.isArray(data) ? data : [];
+}
+
+/* loadCourses moved to inline canvas panel */
+
+function guessType(name, submissionTypes) {
+  var n = (name||'').toLowerCase();
+  if(n.includes('quiz') || n.includes('test') || n.includes('exam') || n.includes('midterm') || n.includes('final')) return 'test';
+  if(n.includes('project') || n.includes('presentation')) return 'project';
+  if(n.includes('read') || n.includes('chapter')) return 'reading';
+  return 'homework';
+}
+
+try { updateDisplay(); } catch(e) { console.error('updateDisplay error:', e); }
+try { renderAll(); } catch(e) { console.error('renderAll error:', e); }
+// Wait for full DOM before showing tutorial
+if(document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function(){ try { initTutorial(); } catch(e){ console.error('tutorial error:',e); } });
+} else {
+  try { initTutorial(); } catch(e) { console.error('tutorial error:', e); }
+}
+</script>
+</body>
+</html>
