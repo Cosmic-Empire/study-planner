@@ -834,10 +834,13 @@ async function importCoursesAsSubjects() {
       await new Promise(function(r){ setTimeout(r, 600); });
     }
 
-    var now = new Date();
+    // Use start of today as cutoff — avoids timezone issues where
+    // assignments due earlier today get incorrectly skipped
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
     assigns.forEach(function(a){
-      // Skip anything already past due — goal is to plan ahead
-      if(a.due_at && new Date(a.due_at) < now) return;
+      // Skip only if due before today
+      if(a.due_at && new Date(a.due_at) < today) return;
       if(!sub.assigns) sub.assigns=[];
       var exists=sub.assigns.find(function(ex){ return ex.canvasId===a.id; });
       if(exists){totalSkipped++;return;}
@@ -1128,8 +1131,3 @@ try { renderAll(); } catch(e) { console.error('renderAll error:', e); }
 if(document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', function(){ try { initTutorial(); } catch(e){ console.error('tutorial error:',e); } });
 } else {
-  try { initTutorial(); } catch(e) { console.error('tutorial error:', e); }
-}
-</script>
-</body>
-</html>
