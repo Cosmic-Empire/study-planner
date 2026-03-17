@@ -150,6 +150,29 @@ nav{display:flex;flex-direction:column;gap:3px}
 .danger-zone{border:1px solid #f7c1c1;border-radius:12px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;background:var(--card-bg)}
 .dark .danger-zone{border-color:#791f1f}
 
+/* Tutorial overlay */
+.tutorial-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;display:flex;align-items:center;justify-content:center;padding:1rem}
+.tutorial-box{background:var(--surface);border-radius:16px;padding:2rem;max-width:420px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,0.18)}
+.tutorial-step{display:none;flex-direction:column;gap:1rem}
+.tutorial-step.active{display:flex}
+.tutorial-icon{font-size:32px;line-height:1}
+.tutorial-title{font-size:17px;font-weight:500;color:var(--text)}
+.tutorial-body{font-size:13px;color:var(--muted);line-height:1.6}
+.tutorial-dots{display:flex;gap:6px;justify-content:center}
+.tutorial-dot{width:7px;height:7px;border-radius:50%;background:var(--border);transition:background 0.2s}
+.tutorial-dot.active{background:var(--text)}
+.tutorial-nav{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
+/* Empty state */
+.empty-state{display:flex;flex-direction:column;align-items:center;gap:12px;padding:3rem 1rem;text-align:center}
+.empty-state-icon{width:48px;height:48px;border-radius:12px;background:var(--stat-bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center}
+.empty-state-title{font-size:15px;font-weight:500;color:var(--text)}
+.empty-state-sub{font-size:13px;color:var(--muted);max-width:280px;line-height:1.5}
+.empty-state-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:4px}
+/* Canvas import inside subjects page */
+.canvas-import-bar{border:1px solid var(--border);border-radius:12px;padding:1rem 1.125rem;background:var(--card-bg);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.canvas-import-bar-text{font-size:13px;color:var(--muted)}
+.canvas-import-bar-text strong{color:var(--text);font-weight:500}
+
 .canvas-status{font-size:12px;padding:6px 10px;border-radius:8px;margin-top:8px;display:none}
 .canvas-status.ok{background:var(--assign-done-bg,#f0faf4);color:var(--assign-done-text,#27500a);display:block}
 .canvas-status.err{background:var(--assign-overdue-bg,#fcebeb);color:var(--assign-overdue-text,#a32d2d);display:block}
@@ -211,8 +234,12 @@ nav{display:flex;flex-direction:column;gap:3px}
 
     <!-- Subjects -->
     <div class="page" id="page-subjects">
-      <div><div class="page-title">Subjects</div><div class="page-sub">Manage subjects, goals and assignments</div></div>
-      <div class="add-form">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div><div class="page-title">Subjects</div><div class="page-sub">Your classes and assignments</div></div>
+        <button class="btn btn-sm" onclick="showAddSubjectForm()" id="add-subject-toggle" style="flex-shrink:0;margin-top:4px">+ New subject</button>
+      </div>
+      <!-- inline add form, hidden by default -->
+      <div class="add-form" id="add-subject-form" style="display:none">
         <input id="inp-name" class="inp inp-flex" placeholder="Subject name (e.g. Biology)" onkeydown="if(event.key==='Enter')addSubject()" />
         <div class="color-picker" id="color-picker">
           <div class="color-swatch selected" data-value="#378ADD|#E6F1FB|#0C447C|#042C53" style="background:#378ADD" onclick="selectColor(this)" title="Blue"></div>
@@ -223,7 +250,8 @@ nav{display:flex;flex-direction:column;gap:3px}
           <div class="color-swatch" data-value="#BA7517|#FAEEDA|#633806|#412402" style="background:#BA7517" onclick="selectColor(this)" title="Amber"></div>
           <div class="color-swatch" data-value="#7F77DD|#EEEDFE|#3C3489|#26215C" style="background:#7F77DD" onclick="selectColor(this)" title="Purple"></div>
         </div>
-        <button class="btn btn-primary" onclick="addSubject()">Add subject</button>
+        <button class="btn btn-primary" onclick="addSubject()">Add</button>
+        <button class="btn" onclick="hideAddSubjectForm()">Cancel</button>
       </div>
       <div id="sub-list" class="subjects-list"></div>
     </div>
@@ -313,32 +341,24 @@ nav{display:flex;flex-direction:column;gap:3px}
         <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:10px">
           <div class="settings-row-label">
             Canvas API token
-            <span class="settings-row-sub">Generated in Canvas → Account → Settings → Approved Integrations. Stored only in your browser.</span>
+            <span class="settings-row-sub">Canvas → Account → Settings → Approved Integrations → New Access Token. Stored only in your browser, never shared.</span>
           </div>
           <div style="display:flex;gap:8px;width:100%">
-            <input type="password" id="canvas-token" class="inp inp-flex canvas-token-input" placeholder="Paste your Canvas token here" oninput="localStorage.setItem('sp_canvas_token',this.value)"/>
+            <input type="password" id="canvas-token" class="inp inp-flex canvas-token-input" placeholder="Paste your Canvas token here" oninput="localStorage.setItem('sp_canvas_token',this.value.trim())"/>
             <button class="btn" onclick="toggleTokenVisibility()">Show</button>
           </div>
         </div>
-        <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:6px">
-          <div class="settings-row-label">
-            Sync assignments
-            <span class="settings-row-sub">Pulls all upcoming assignments from sdhc.instructure.com and imports them into your subjects.</span>
-          </div>
-          <button class="btn btn-primary" onclick="loadCourses()" id="canvas-sync-btn" style="margin-top:2px">Load my courses</button>
-          <div id="canvas-status" class="canvas-status"></div>
+        <div class="settings-row">
+          <div class="settings-row-label">Import from Canvas<span class="settings-row-sub">Go to Subjects to sync your Canvas courses</span></div>
+          <button class="btn btn-primary btn-sm" onclick="goToCanvasImport()">Open Subjects</button>
         </div>
       </div>
-      <div id="canvas-courses-wrap" style="display:none">
-        <div class="settings-section-title" style="margin-top:1.25rem">Select courses to import</div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Tick the courses you want, match them to a subject, then click Import.</div>
-        <div class="settings-group" id="canvas-courses-list"></div>
-        <div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="importSelected()" id="canvas-import-btn">Import selected courses</button>
-          <button class="btn" onclick="selectAllCourses()">Select all</button>
-          <button class="btn" onclick="selectNoneCourses()">Deselect all</button>
+      <div class="settings-section-title" style="margin-top:1.25rem">Help</div>
+      <div class="settings-group">
+        <div class="settings-row">
+          <div class="settings-row-label">Tutorial<span class="settings-row-sub">Replay the getting started walkthrough</span></div>
+          <button class="btn btn-sm" onclick="replayTutorial()">Replay</button>
         </div>
-        <div id="canvas-import-status" class="canvas-status"></div>
       </div>
       <div class="settings-section-title" style="margin-top:1.25rem">Data</div>
       <div class="danger-zone">
@@ -550,10 +570,264 @@ function subjectCardCompact(s) {
     '</div>';
 }
 
+
+/* ── Tutorial ── */
+var tutStep = 0;
+var tutTotal = 5;
+
+function replayTutorial() {
+  localStorage.removeItem('sp_tutorial_done');
+  tutStep=0; renderTutorial();
+  document.getElementById('tutorial-overlay').style.display='flex';
+}
+
+function initTutorial() {
+  if(!localStorage.getItem('sp_tutorial_done')) {
+    tutStep = 0;
+    renderTutorial();
+    document.getElementById('tutorial-overlay').style.display = 'flex';
+  }
+}
+
+function renderTutorial() {
+  document.querySelectorAll('.tutorial-step').forEach(function(s,i){ s.classList.toggle('active', i===tutStep); });
+  var dots = document.getElementById('tutorial-dots');
+  dots.innerHTML = Array.from({length:tutTotal}).map(function(_,i){
+    return '<div class="tutorial-dot'+(i===tutStep?' active':'')+'"></div>';
+  }).join('');
+  document.getElementById('tut-back').style.visibility = tutStep===0?'hidden':'visible';
+  document.getElementById('tut-next').textContent = tutStep===tutTotal-1?'Get started':'Next';
+}
+
+function tutNav(dir) {
+  tutStep += dir;
+  if(tutStep >= tutTotal) {
+    document.getElementById('tutorial-overlay').style.display = 'none';
+    localStorage.setItem('sp_tutorial_done','1');
+    return;
+  }
+  if(tutStep < 0) tutStep = 0;
+  renderTutorial();
+}
+
+/* ── Subject form toggle ── */
+function showAddSubjectForm() {
+  document.getElementById('add-subject-form').style.display = 'flex';
+  document.getElementById('add-subject-toggle').style.display = 'none';
+  document.getElementById('inp-name').focus();
+}
+function hideAddSubjectForm() {
+  document.getElementById('add-subject-form').style.display = 'none';
+  document.getElementById('add-subject-toggle').style.display = '';
+}
+
+/* ── Navigate to subjects + open Canvas import ── */
+function goToCanvasImport() {
+  var subBtn = document.querySelector('.nav-btn[data-page="subjects"]');
+  if(subBtn) showPage(subBtn);
+  setTimeout(function(){ showCanvasImportInSubjects(); }, 100);
+}
+
+function showCanvasImportInSubjects() {
+  var bar = document.getElementById('canvas-import-inline');
+  if(bar) bar.scrollIntoView({behavior:'smooth'});
+}
+
+
+/* ── Inline Canvas import panel (shown inside Subjects page) ── */
+var canvasLoadedCourses = [];
+
+function openCanvasImportPanel() {
+  var token = getToken();
+  if(!token) { alert('Add your Canvas token in Settings first.'); return; }
+  // insert panel after canvas-import-bar if not already there
+  var existing = document.getElementById('canvas-panel');
+  if(existing) { existing.style.display='block'; existing.scrollIntoView({behavior:'smooth'}); return; }
+  var bar = document.getElementById('canvas-import-inline');
+  if(!bar) return;
+  var panel = document.createElement('div');
+  panel.id = 'canvas-panel';
+  panel.style.cssText = 'display:flex;flex-direction:column;gap:10px;margin-top:10px';
+  panel.innerHTML =
+    '<div class="settings-group" style="border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--card-bg)">' +
+      '<div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">' +
+        '<span style="font-size:13px;font-weight:500;color:var(--text)">Canvas import</span>' +
+        '<button class="btn btn-sm" onclick="closeCanvasPanel()">Close</button>' +
+      '</div>' +
+      '<div style="padding:12px 16px">' +
+        '<button class="btn btn-primary btn-sm" onclick="loadCoursesInline()" id="canvas-load-btn">Load my Canvas courses</button>' +
+        '<div id="canvas-panel-status" class="canvas-status" style="margin-top:8px"></div>' +
+      '</div>' +
+      '<div id="canvas-panel-courses" style="display:none">' +
+        '<div style="padding:8px 16px;font-size:12px;color:var(--muted);border-top:1px solid var(--border)">Tick the courses to import. A new subject will be created for each one.</div>' +
+        '<div id="canvas-panel-list"></div>' +
+        '<div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap">' +
+          '<button class="btn btn-primary btn-sm" onclick="importCoursesAsSubjects()" id="canvas-do-import-btn">Import selected</button>' +
+          '<button class="btn btn-sm" onclick="selectAllInline()">All</button>' +
+          '<button class="btn btn-sm" onclick="selectNoneInline()">None</button>' +
+        '</div>' +
+        '<div id="canvas-panel-import-status" class="canvas-status" style="margin:0 16px 12px"></div>' +
+      '</div>' +
+    '</div>';
+  bar.parentNode.insertBefore(panel, bar.nextSibling);
+  panel.scrollIntoView({behavior:'smooth'});
+}
+
+function closeCanvasPanel() {
+  var p = document.getElementById('canvas-panel');
+  if(p) p.style.display = 'none';
+}
+
+function setPanelStatus(msg, type) {
+  var el = document.getElementById('canvas-panel-status');
+  if(el){ el.textContent=msg; el.className='canvas-status '+type; }
+}
+
+async function loadCoursesInline() {
+  var token = getToken();
+  var btn = document.getElementById('canvas-load-btn');
+  btn.textContent='Loading...'; btn.disabled=true;
+  setPanelStatus('Connecting to Canvas...', 'loading');
+  try {
+    var courses = await canvasFetchSafe('/api/v1/courses?enrollment_state=active&per_page=50');
+    courses = courses.filter(function(c){ return c.name && !c.access_restricted_by_date; });
+    canvasLoadedCourses = courses;
+    if(!courses.length){ setPanelStatus('No active courses found. Check your token in Settings.', 'err'); btn.textContent='Load my Canvas courses'; btn.disabled=false; return; }
+    renderInlineCourseList(courses);
+    setPanelStatus('Found ' + courses.length + ' courses. Select which to import as subjects.', 'ok');
+    document.getElementById('canvas-panel-courses').style.display='block';
+  } catch(e) {
+    setPanelStatus('Error: '+e.message, 'err');
+  }
+  btn.textContent='Reload courses'; btn.disabled=false;
+}
+
+function renderInlineCourseList(courses) {
+  var list = document.getElementById('canvas-panel-list');
+  list.innerHTML = courses.map(function(c){
+    // check if subject already exists with similar name
+    var exists = subjects.find(function(s){ return s.name.toLowerCase()===c.name.toLowerCase(); });
+    return '<div class="canvas-course-row" style="padding:10px 16px;border-top:1px solid var(--border)">' +
+      '<div style="display:flex;align-items:center;gap:10px;flex:1">' +
+        '<input type="checkbox" class="assign-cb inline-course-cb" id="icb-'+c.id+'" '+(exists?'':'checked')+' />' +
+        '<div>' +
+          '<div style="font-size:13px;color:var(--text)">'+esc(c.name)+'</div>' +
+          (exists?'<div style="font-size:11px;color:var(--muted)">Subject already exists — will add assignments only</div>':'') +
+        '</div>' +
+      '</div>' +
+      '<div class="color-picker" id="cpicker-'+c.id+'" style="gap:5px">' +
+        colorSwatchesHTML('cpicker-'+c.id) +
+      '</div>' +
+    '</div>';
+  }).join('');
+  // auto-assign colors cycling through palette
+  var palette = ['#378ADD','#1D9E75','#D85A30','#D4537E','#639922','#BA7517','#7F77DD'];
+  courses.forEach(function(c, i){
+    var swatches = document.querySelectorAll('#cpicker-'+c.id+' .color-swatch');
+    swatches[i % palette.length].classList.add('selected');
+  });
+}
+
+function colorSwatchesHTML(pickerId) {
+  var colors = [
+    {mid:'#378ADD',light:'#E6F1FB',dark:'#0C447C',dd:'#042C53'},
+    {mid:'#1D9E75',light:'#E1F5EE',dark:'#085041',dd:'#04342C'},
+    {mid:'#D85A30',light:'#FAECE7',dark:'#712B13',dd:'#4A1B0C'},
+    {mid:'#D4537E',light:'#FBEAF0',dark:'#72243E',dd:'#4B1528'},
+    {mid:'#639922',light:'#EAF3DE',dark:'#27500A',dd:'#173404'},
+    {mid:'#BA7517',light:'#FAEEDA',dark:'#633806',dd:'#412402'},
+    {mid:'#7F77DD',light:'#EEEDFE',dark:'#3C3489',dd:'#26215C'},
+  ];
+  return colors.map(function(c){
+    var val = c.mid+'|'+c.light+'|'+c.dark+'|'+c.dd;
+    return '<div class="color-swatch" data-value="'+val+'" style="background:'+c.mid+';width:18px;height:18px" onclick="selectInlineSwatch(this)"></div>';
+  }).join('');
+}
+
+function selectInlineSwatch(el) {
+  var picker = el.closest('.color-picker');
+  picker.querySelectorAll('.color-swatch').forEach(function(s){ s.classList.remove('selected'); });
+  el.classList.add('selected');
+}
+
+function selectAllInline(){ document.querySelectorAll('.inline-course-cb').forEach(function(cb){cb.checked=true;}); }
+function selectNoneInline(){ document.querySelectorAll('.inline-course-cb').forEach(function(cb){cb.checked=false;}); }
+
+async function importCoursesAsSubjects() {
+  var selected = canvasLoadedCourses.filter(function(c){
+    var cb=document.getElementById('icb-'+c.id); return cb&&cb.checked;
+  });
+  if(!selected.length){
+    var el=document.getElementById('canvas-panel-import-status');
+    el.textContent='Select at least one course.'; el.className='canvas-status err'; return;
+  }
+  var btn=document.getElementById('canvas-do-import-btn');
+  btn.textContent='Importing...'; btn.disabled=true;
+  var el=document.getElementById('canvas-panel-import-status');
+  var palette = ['#378ADD|#E6F1FB|#0C447C|#042C53','#1D9E75|#E1F5EE|#085041|#04342C','#D85A30|#FAECE7|#712B13|#4A1B0C','#D4537E|#FBEAF0|#72243E|#4B1528','#639922|#EAF3DE|#27500A|#173404','#BA7517|#FAEEDA|#633806|#412402','#7F77DD|#EEEDFE|#3C3489|#26215C'];
+  var totalImported=0, totalSkipped=0;
+
+  for(var i=0;i<selected.length;i++) {
+    var course=selected[i];
+    el.textContent='Importing '+course.name+' ('+(i+1)+'/'+selected.length+')...';
+    el.className='canvas-status loading';
+
+    // get chosen color
+    var swatch=document.querySelector('#cpicker-'+course.id+' .color-swatch.selected');
+    var cv=swatch?swatch.dataset.value:palette[i%palette.length];
+    var c=colorParts(cv);
+
+    // find or create subject
+    var sub=subjects.find(function(s){ return s.name.toLowerCase()===course.name.toLowerCase(); });
+    if(!sub) {
+      sub={id:Date.now()+i, name:course.name, mid:c.mid, light:c.light, dark:c.dark, dd:c.dd, studied:0, assigns:[]};
+      subjects.push(sub);
+    }
+
+    // fetch assignments
+    try {
+      var assigns=await canvasFetchSafe('/api/v1/courses/'+course.id+'/assignments?order_by=due_at&per_page=50');
+      assigns.forEach(function(a){
+        var isPastDue=a.due_at&&new Date(a.due_at)<new Date();
+        if(isPastDue) return;
+        if(!sub.assigns) sub.assigns=[];
+        var exists=sub.assigns.find(function(ex){ return ex.canvasId===a.id; });
+        if(exists){totalSkipped++;return;}
+        sub.assigns.push({id:Date.now()+totalImported, canvasId:a.id, title:a.name, due:a.due_at?a.due_at.split('T')[0]:'', type:guessType(a.name,a.submission_types), done:false});
+        totalImported++;
+      });
+    } catch(e) {
+      console.warn('Failed',course.name,e.message);
+    }
+    save();
+  }
+
+  renderAll();
+  el.textContent='Done! Created/updated '+selected.length+' subjects and imported '+totalImported+' assignments'+(totalSkipped?' ('+totalSkipped+' already existed).':'.');
+  el.className='canvas-status ok';
+  btn.textContent='Import selected'; btn.disabled=false;
+}
 function renderSubjects() {
   var el=document.getElementById('sub-list');
-  if(!subjects.length){el.innerHTML='<div class="empty">No subjects yet — add one above!</div>';return;}
-  el.innerHTML=subjects.map(subjectCardFull).join('');
+  var token = getToken();
+  var canvasBar = '<div class="canvas-import-bar" id="canvas-import-inline">' +
+    '<div class="canvas-import-bar-text"><strong>Import from Canvas</strong> — pull your courses and assignments automatically' +
+    (token ? '' : ' <span style="color:var(--muted)">(add your token in Settings first)</span>') + '</div>' +
+    '<button class="btn btn-sm btn-primary" onclick="openCanvasImportPanel()" ' + (token?'':'disabled title="Add your Canvas token in Settings first"') + '>Sync Canvas</button>' +
+    '</div>';
+  if(!subjects.length) {
+    el.innerHTML = '<div class="empty-state">' +
+      '<div class="empty-state-icon"><svg width="22" height="22" viewBox="0 0 16 16" fill="currentColor" style="color:var(--muted)"><rect x="2" y="2" width="12" height="2" rx="1"/><rect x="2" y="7" width="8" height="2" rx="1"/><rect x="2" y="12" width="10" height="2" rx="1"/></svg></div>' +
+      '<div class="empty-state-title">No subjects yet</div>' +
+      '<div class="empty-state-sub">Create a subject manually or import your courses straight from Canvas.</div>' +
+      '<div class="empty-state-actions">' +
+        '<button class="btn btn-primary" onclick="showAddSubjectForm()">+ Create subject</button>' +
+        '<button class="btn" onclick="openCanvasImportPanel()" ' + (token?'':'disabled title="Add your Canvas token in Settings first"') + '>Sync from Canvas</button>' +
+      '</div>' +
+    '</div>' + canvasBar;
+    return;
+  }
+  el.innerHTML = subjects.map(subjectCardFull).join('') + canvasBar;
 }
 
 function renderDash() {
@@ -826,108 +1100,7 @@ async function canvasFetchSafe(canvasPath) {
   return allResults;
 }
 
-async function loadCourses() {
-  var token = getToken();
-  if(!token) { setCanvasStatus('Paste your Canvas token above first.', 'err'); return; }
-  var btn = document.getElementById('canvas-sync-btn');
-  btn.textContent = 'Loading...'; btn.disabled = true;
-  setCanvasStatus('Fetching your course list...', 'loading');
-  try {
-    var courses = await canvasFetchSafe('/api/v1/courses?enrollment_state=active&per_page=50');
-    courses = courses.filter(function(c){ return c.name && !c.access_restricted_by_date; });
-    canvasLoadedCourses = courses;
-    if(!courses.length) {
-      setCanvasStatus('No active courses found. Check your token and try again.', 'err');
-      btn.textContent = 'Load my courses'; btn.disabled = false;
-      return;
-    }
-    renderCourseSelector(courses);
-    setCanvasStatus('Found ' + courses.length + ' courses. Select which ones to import assignments from, match them to a subject, then click Import.', 'ok');
-  } catch(e) {
-    setCanvasStatus('Error: ' + e.message, 'err');
-  }
-  btn.textContent = 'Reload courses'; btn.disabled = false;
-}
-
-function renderCourseSelector(courses) {
-  var wrap = document.getElementById('canvas-courses-wrap');
-  var list = document.getElementById('canvas-courses-list');
-  wrap.style.display = 'block';
-  list.innerHTML = courses.map(function(c) {
-    var opts = '<option value="">— skip —</option>' +
-      subjects.map(function(s){ return '<option value="'+s.id+'">'+esc(s.name)+'</option>'; }).join('');
-    var autoMatch = '';
-    subjects.forEach(function(s){
-      var cn = c.name.toLowerCase(); var sn = s.name.toLowerCase();
-      if(cn.includes(sn) || sn.includes(cn)) autoMatch = String(s.id);
-    });
-    var optsWithMatch = opts.replace('value="'+autoMatch+'"', 'value="'+autoMatch+'" selected');
-    return '<div class="canvas-course-row">'+
-      '<div style="display:flex;align-items:center;gap:10px;flex:1">'+
-        '<input type="checkbox" class="assign-cb course-cb" id="cb-'+c.id+'" checked style="flex-shrink:0"/>'+
-        '<div>'+
-          '<div class="canvas-course-name">'+esc(c.name)+'</div>'+
-        '</div>'+
-      '</div>'+
-      '<select class="inp canvas-course-map" id="map-'+c.id+'">'+optsWithMatch+'</select>'+
-    '</div>';
-  }).join('');
-}
-
-function selectAllCourses() {
-  document.querySelectorAll('.course-cb').forEach(function(cb){ cb.checked = true; });
-}
-function selectNoneCourses() {
-  document.querySelectorAll('.course-cb').forEach(function(cb){ cb.checked = false; });
-}
-
-async function importSelected() {
-  var token = getToken();
-  if(!token) { setCanvasStatus('No token found.', 'err'); return; }
-  var selected = canvasLoadedCourses.filter(function(c){
-    var cb = document.getElementById('cb-'+c.id);
-    return cb && cb.checked;
-  });
-  if(!selected.length) {
-    document.getElementById('canvas-import-status').textContent = 'No courses selected — tick at least one course above.';
-    document.getElementById('canvas-import-status').className = 'canvas-status err';
-    return;
-  }
-  var btn = document.getElementById('canvas-import-btn');
-  btn.textContent = 'Importing...'; btn.disabled = true;
-  document.getElementById('canvas-import-status').textContent = 'Fetching assignments from ' + selected.length + ' course(s)...';
-  document.getElementById('canvas-import-status').className = 'canvas-status loading';
-
-  var imported = 0, skipped = 0;
-  for(var i = 0; i < selected.length; i++) {
-    var c = selected[i];
-    var mapSel = document.getElementById('map-'+c.id);
-    var subId = mapSel ? mapSel.value : '';
-    document.getElementById('canvas-import-status').textContent = 'Fetching ' + (i+1) + ' / ' + selected.length + ': ' + c.name + '...';
-    try {
-      var assigns = await canvasFetchSafe('/api/v1/courses/'+c.id+'/assignments?order_by=due_at&per_page=50');
-      assigns.forEach(function(a){
-        var isPastDue = a.due_at && new Date(a.due_at) < new Date();
-        if(isPastDue) return;
-        if(!subId) { skipped++; return; }
-        var sub = subjects.find(function(s){ return s.id == subId; });
-        if(!sub) { skipped++; return; }
-        if(!sub.assigns) sub.assigns = [];
-        var exists = sub.assigns.find(function(ex){ return ex.canvasId === a.id; });
-        if(exists) { skipped++; return; }
-        sub.assigns.push({ id: Date.now()+imported, canvasId: a.id, title: a.name, due: a.due_at ? a.due_at.split('T')[0] : '', type: guessType(a.name, a.submission_types), done: false });
-        imported++;
-      });
-    } catch(e) {
-      console.warn('Failed to fetch', c.name, e.message);
-    }
-  }
-  save(); renderAll();
-  var el = document.getElementById('canvas-import-status');
-  el.textContent = 'Done! Imported ' + imported + ' assignments' + (skipped ? ' (' + skipped + ' skipped).' : '.');
-  el.className = 'canvas-status ok';
-  btn.textContent = 'Import selected courses'; btn.disabled = false;
-}
+/* loadCourses moved to inline canvas panel */
 
 function guessType(name, submissionTypes) {
   var n = (name||'').toLowerCase();
@@ -939,6 +1112,7 @@ function guessType(name, submissionTypes) {
 
 updateDisplay();
 renderAll();
+initTutorial();
 </script>
 </body>
 </html>
