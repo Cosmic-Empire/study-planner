@@ -661,10 +661,13 @@ function clearAll() {
 
 /* ── Navigation ── */
 function showPage(btn) {
+  var page = btn.dataset.page;
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
-  document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
-  document.getElementById('page-'+btn.dataset.page).classList.add('active');
-  btn.classList.add('active');
+  // Clear both desktop and mobile nav active states
+  document.querySelectorAll('.nav-btn, .mobile-nav-btn').forEach(function(b){b.classList.remove('active');});
+  document.getElementById('page-'+page).classList.add('active');
+  // Set active on ALL buttons matching this page (desktop + mobile)
+  document.querySelectorAll('[data-page="'+page+'"]').forEach(function(b){b.classList.add('active');});
   renderAll();
 }
 
@@ -1063,10 +1066,10 @@ async function importCoursesAsSubjects() {
 function renderSubjects() {
   var el=document.getElementById('sub-list');
   var token = getToken();
-  var canvasBar = '<div id="canvas-import-inline" style="margin-top:12px">' +
-    '<button class="btn btn-sm btn-primary" onclick="openCanvasImportPanel()" ' + (token?'':'disabled title="Add your Canvas token in Settings first"') + ' style="width:100%;justify-content:center;display:flex;align-items:center;gap:6px">' +
-    '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 8A5 5 0 1 1 8 3"/><path d="M8 1v4l3-2"/></svg>' +
-    (token ? ' Sync from Canvas' : ' Sync from Canvas (add token in Settings first)') +
+  var canvasBtnStyle = 'display:block;width:100%;padding:10px;border-radius:10px;font-size:13px;font-weight:500;text-align:center;cursor:pointer;font-family:DM Sans,sans-serif;border:none;margin-top:12px;' + (token ? 'background:#1a1a1a;color:#fff;' : 'background:var(--stat-bg);color:var(--muted);border:1px solid var(--border);cursor:default;');
+  var canvasBar = '<div id="canvas-import-inline">' +
+    '<button onclick="openCanvasImportPanel()" ' + (token?'':'disabled') + ' style="' + canvasBtnStyle + '">' +
+    (token ? '↻ Sync from Canvas' : '↻ Sync from Canvas (add token in Settings first)') +
     '</button></div>';
   if(!subjects.length) {
     el.innerHTML = '<div class="empty-state">' +
