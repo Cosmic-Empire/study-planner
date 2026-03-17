@@ -833,9 +833,10 @@ async function importCoursesAsSubjects() {
       await new Promise(function(r){ setTimeout(r, 600); });
     }
 
+    var now = new Date();
     assigns.forEach(function(a){
-      var isPastDue=a.due_at&&new Date(a.due_at)<new Date();
-      if(isPastDue) return;
+      // Skip anything already past due — goal is to plan ahead
+      if(a.due_at && new Date(a.due_at) < now) return;
       if(!sub.assigns) sub.assigns=[];
       var exists=sub.assigns.find(function(ex){ return ex.canvasId===a.id; });
       if(exists){totalSkipped++;return;}
@@ -1094,40 +1095,3 @@ async function canvasFetch(canvasPath) {
     }
   }
   return allResults;
-}
-
-async function canvasFetchSafe(canvasPath) {
-  var token = getToken();
-  var parts = canvasPath.split('?');
-  var pathOnly = parts[0];
-  var qs = parts[1] ? '&' + parts[1] : '';
-  var proxyUrl = '/api/canvas?path=' + encodeURIComponent(pathOnly) + '&per_page=50' + qs;
-  // Proxy handles timeout server-side and returns [] on abort — no client hang
-  var res = await fetch(proxyUrl, { headers: { 'Authorization': 'Bearer ' + token } });
-  if(res.status === 401) throw new Error('Invalid token — check Settings');
-  var data = await res.json();
-  if(data && data.error) throw new Error(data.error);
-  return Array.isArray(data) ? data : [];
-}
-
-/* loadCourses moved to inline canvas panel */
-
-function guessType(name, submissionTypes) {
-  var n = (name||'').toLowerCase();
-  if(n.includes('quiz') || n.includes('test') || n.includes('exam') || n.includes('midterm') || n.includes('final')) return 'test';
-  if(n.includes('project') || n.includes('presentation')) return 'project';
-  if(n.includes('read') || n.includes('chapter')) return 'reading';
-  return 'homework';
-}
-
-updateDisplay();
-renderAll();
-// Wait for full DOM before showing tutorial
-if(document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initTutorial);
-} else {
-  initTutorial();
-}
-</script>
-</body>
-</html>
