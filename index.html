@@ -1086,7 +1086,12 @@ function guessType(name, submissionTypes) {
 
 updateDisplay();
 renderAll();
-initTutorial();
+// Wait for full DOM before showing tutorial
+if(document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initTutorial);
+} else {
+  initTutorial();
+}
 </script>
 </body>
 </html>
