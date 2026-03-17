@@ -372,6 +372,42 @@ nav{display:flex;flex-direction:column;gap:3px}
   </div>
 </div>
 
+<!-- Tutorial overlay -->
+<div class="tutorial-overlay" id="tutorial-overlay" style="display:none">
+  <div class="tutorial-box">
+    <div class="tutorial-step active" id="tstep-0">
+      <div class="tutorial-icon">👋</div>
+      <div class="tutorial-title">Welcome to your Study Planner!</div>
+      <div class="tutorial-body">This is your personal tool for staying on top of classes, assignments, and study sessions. Let's take a quick tour.</div>
+    </div>
+    <div class="tutorial-step" id="tstep-1">
+      <div class="tutorial-icon">📚</div>
+      <div class="tutorial-title">Subjects</div>
+      <div class="tutorial-body">Go to <strong>Subjects</strong> to create your classes manually, or sync directly from Canvas to pull in your real courses and assignments automatically.</div>
+    </div>
+    <div class="tutorial-step" id="tstep-2">
+      <div class="tutorial-icon">✅</div>
+      <div class="tutorial-title">Assignments</div>
+      <div class="tutorial-body">Each subject has its own assignment list. Add them manually or import from Canvas. Check them off as you complete them — the progress bar fills up.</div>
+    </div>
+    <div class="tutorial-step" id="tstep-3">
+      <div class="tutorial-icon">⏱</div>
+      <div class="tutorial-title">Focus Timer</div>
+      <div class="tutorial-body">The <strong>Timer</strong> uses the Pomodoro technique — 25 min focus, then a short break. Pick a subject and your session gets logged automatically.</div>
+    </div>
+    <div class="tutorial-step" id="tstep-4">
+      <div class="tutorial-icon">🎉</div>
+      <div class="tutorial-title">You're all set!</div>
+      <div class="tutorial-body">Start by going to <strong>Subjects</strong> and creating your first subject or syncing with Canvas. Replay this tutorial anytime from Settings.</div>
+    </div>
+    <div class="tutorial-dots" id="tutorial-dots"></div>
+    <div class="tutorial-nav">
+      <button class="btn btn-sm" id="tut-back" onclick="tutNav(-1)">Back</button>
+      <button class="btn btn-primary btn-sm" id="tut-next" onclick="tutNav(1)">Next</button>
+    </div>
+  </div>
+</div>
+
 <script>
 var subjects = JSON.parse(localStorage.getItem('sp_subjects') || '[]');
 var sessions  = JSON.parse(localStorage.getItem('sp_sessions')  || '[]');
