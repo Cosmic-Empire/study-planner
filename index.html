@@ -150,6 +150,16 @@ nav{display:flex;flex-direction:column;gap:3px}
 .danger-zone{border:1px solid #f7c1c1;border-radius:12px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;background:var(--card-bg)}
 .dark .danger-zone{border-color:#791f1f}
 
+.canvas-status{font-size:12px;padding:6px 10px;border-radius:8px;margin-top:8px;display:none}
+.canvas-status.ok{background:var(--assign-done-bg,#f0faf4);color:var(--assign-done-text,#27500a);display:block}
+.canvas-status.err{background:var(--assign-overdue-bg,#fcebeb);color:var(--assign-overdue-text,#a32d2d);display:block}
+.canvas-status.loading{background:var(--stat-bg);color:var(--muted);display:block}
+.canvas-token-input{font-family:monospace;font-size:12px;letter-spacing:0.03em}
+.canvas-course-row{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text);gap:12px}
+.canvas-course-row:last-child{border-bottom:none}
+.canvas-course-name{flex:1;font-size:13px}
+.canvas-course-map{width:150px;font-size:12px;padding:5px 8px}
+
 /* Misc */
 .empty{font-size:13px;color:var(--faint);text-align:center;padding:2rem 0}
 .cdot{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle;margin-right:5px;flex-shrink:0}
@@ -297,6 +307,34 @@ nav{display:flex;flex-direction:column;gap:3px}
         </div>
       </div>
 
+
+      <div class="settings-section-title" style="margin-top:1.25rem">Canvas sync</div>
+      <div class="settings-group">
+        <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:10px">
+          <div class="settings-row-label">
+            Canvas API token
+            <span class="settings-row-sub">Generated in Canvas → Account → Settings → Approved Integrations. Stored only in your browser.</span>
+          </div>
+          <div style="display:flex;gap:8px;width:100%">
+            <input type="password" id="canvas-token" class="inp inp-flex canvas-token-input" placeholder="Paste your Canvas token here" oninput="localStorage.setItem('sp_canvas_token',this.value)"/>
+            <button class="btn" onclick="toggleTokenVisibility()">Show</button>
+          </div>
+        </div>
+        <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:6px">
+          <div class="settings-row-label">
+            Sync assignments
+            <span class="settings-row-sub">Pulls all upcoming assignments from sdhc.instructure.com and imports them into your subjects.</span>
+          </div>
+          <button class="btn btn-primary" onclick="syncCanvas()" id="canvas-sync-btn" style="margin-top:2px">Sync from Canvas</button>
+          <div id="canvas-status" class="canvas-status"></div>
+        </div>
+      </div>
+      <div id="canvas-courses-wrap" style="display:none">
+        <div class="settings-section-title" style="margin-top:1.25rem">Match Canvas courses to subjects</div>
+        <div class="settings-group" id="canvas-courses-list"></div>
+        <button class="btn btn-primary" style="margin-top:10px" onclick="applyCanvasAssignments()">Import matched assignments</button>
+        <div id="canvas-import-status" class="canvas-status"></div>
+      </div>
       <div class="settings-section-title" style="margin-top:1.25rem">Data</div>
       <div class="danger-zone">
         <div>
@@ -667,6 +705,158 @@ function resetTimer() {
 }
 
 applyTheme();
+/* ── Canvas Sync ── */
+var canvasCourses = [];
+var canvasPendingAssignments = [];
+var CANVAS_URL = 'https://sdhc.instructure.com';
+
+function getToken() {
+  return localStorage.getItem('sp_canvas_token') || '';
+}
+
+function toggleTokenVisibility() {
+  var inp = document.getElementById('canvas-token');
+  var btn = inp.nextElementSibling;
+  if(inp.type === 'password') { inp.type = 'text'; btn.textContent = 'Hide'; }
+  else { inp.type = 'password'; btn.textContent = 'Show'; }
+}
+
+function setCanvasStatus(msg, type) {
+  var el = document.getElementById('canvas-status');
+  el.textContent = msg;
+  el.className = 'canvas-status ' + type;
+}
+
+function renderSettings() {
+  document.getElementById('set-focus').value = settings.focus;
+  document.getElementById('set-short').value = settings.short;
+  document.getElementById('set-long').value  = settings.long;
+  var tokenEl = document.getElementById('canvas-token');
+  if(tokenEl) tokenEl.value = getToken();
+}
+
+async function canvasFetch(path) {
+  var token = getToken();
+  if(!token) throw new Error('No token — paste your Canvas API token first.');
+  var url = CANVAS_URL + path;
+  var allResults = [];
+  while(url) {
+    var res = await fetch(url, {
+      headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }
+    });
+    if(!res.ok) {
+      if(res.status === 401) throw new Error('Invalid token — check your Canvas API token and try again.');
+      throw new Error('Canvas error ' + res.status + '. Make sure your token is correct.');
+    }
+    var data = await res.json();
+    if(Array.isArray(data)) allResults = allResults.concat(data);
+    else return data;
+    // handle pagination
+    var link = res.headers.get('Link') || '';
+    var next = link.match(/<([^>]+)>;\s*rel="next"/);
+    url = next ? next[1] : null;
+  }
+  return allResults;
+}
+
+async function syncCanvas() {
+  var token = getToken();
+  if(!token) { setCanvasStatus('Paste your Canvas token above first.', 'err'); return; }
+  var btn = document.getElementById('canvas-sync-btn');
+  btn.textContent = 'Syncing...'; btn.disabled = true;
+  setCanvasStatus('Connecting to Canvas...', 'loading');
+  try {
+    // fetch active courses
+    var courses = await canvasFetch('/api/v1/courses?enrollment_state=active&per_page=50');
+    courses = courses.filter(function(c){ return c.name && !c.access_restricted_by_date; });
+    canvasCourses = courses;
+
+    // fetch upcoming assignments for each course
+    var now = new Date().toISOString();
+    var allAssigns = [];
+    for(var i=0; i<courses.length; i++) {
+      try {
+        var assigns = await canvasFetch('/api/v1/courses/'+courses[i].id+'/assignments?bucket=upcoming&per_page=50&order_by=due_at');
+        assigns.forEach(function(a){
+          if(a.due_at) {
+            allAssigns.push({
+              canvasId: a.id,
+              title: a.name,
+              due: a.due_at ? a.due_at.split('T')[0] : '',
+              courseId: courses[i].id,
+              courseName: courses[i].name,
+              type: guessType(a.name, a.submission_types)
+            });
+          }
+        });
+      } catch(e) { /* skip courses we can't read */ }
+    }
+    canvasPendingAssignments = allAssigns;
+
+    // render course matching UI
+    renderCourseMatching(courses);
+    setCanvasStatus('Found ' + allAssigns.length + ' upcoming assignments across ' + courses.length + ' courses. Match courses to subjects below, then click Import.', 'ok');
+  } catch(e) {
+    setCanvasStatus(e.message, 'err');
+  }
+  btn.textContent = 'Sync from Canvas'; btn.disabled = false;
+}
+
+function guessType(name, submissionTypes) {
+  var n = (name||'').toLowerCase();
+  if(n.includes('quiz') || n.includes('test') || n.includes('exam') || n.includes('midterm') || n.includes('final')) return 'test';
+  if(n.includes('project') || n.includes('presentation')) return 'project';
+  if(n.includes('read') || n.includes('chapter')) return 'reading';
+  return 'homework';
+}
+
+function renderCourseMatching(courses) {
+  var wrap = document.getElementById('canvas-courses-wrap');
+  var list = document.getElementById('canvas-courses-list');
+  if(!courses.length) { wrap.style.display='none'; return; }
+  wrap.style.display = 'block';
+  list.innerHTML = courses.map(function(c) {
+    var assignCount = canvasPendingAssignments.filter(function(a){ return a.courseId===c.id; }).length;
+    var opts = '<option value="">— skip —</option>' +
+      subjects.map(function(s){ return '<option value="'+s.id+'">'+esc(s.name)+'</option>'; }).join('');
+    // try to auto-match by name similarity
+    var autoMatch = '';
+    subjects.forEach(function(s){
+      var cn = c.name.toLowerCase(); var sn = s.name.toLowerCase();
+      if(cn.includes(sn) || sn.includes(cn)) autoMatch = s.id;
+    });
+    return '<div class="canvas-course-row">'+
+      '<div>'+
+        '<div class="canvas-course-name">'+esc(c.name)+'</div>'+
+        '<div style="font-size:11px;color:var(--muted)">'+assignCount+' upcoming assignments</div>'+
+      '</div>'+
+      '<select class="inp canvas-course-map" id="map-'+c.id+'">'+
+        opts.replace('value="'+autoMatch+'"', 'value="'+autoMatch+'" selected')+
+      '</select>'+
+    '</div>';
+  }).join('');
+}
+
+function applyCanvasAssignments() {
+  var imported = 0, skipped = 0;
+  canvasPendingAssignments.forEach(function(a) {
+    var sel = document.getElementById('map-'+a.courseId);
+    if(!sel || !sel.value) { skipped++; return; }
+    var sub = subjects.find(function(s){ return s.id == sel.value; });
+    if(!sub) { skipped++; return; }
+    if(!sub.assigns) sub.assigns = [];
+    // avoid duplicates by canvas id
+    var exists = sub.assigns.find(function(ex){ return ex.canvasId === a.canvasId; });
+    if(exists) { skipped++; return; }
+    sub.assigns.push({ id: Date.now()+imported, canvasId: a.canvasId, title: a.title, due: a.due, type: a.type, done: false });
+    imported++;
+  });
+  save(); renderAll();
+  var el = document.getElementById('canvas-import-status');
+  el.textContent = 'Imported ' + imported + ' assignments' + (skipped?' ('+skipped+' skipped — already exists or no subject matched).':'.') ;
+  el.className = 'canvas-status ok';
+}
+
 updateDisplay();
 renderAll();
 </script>
