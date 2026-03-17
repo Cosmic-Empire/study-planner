@@ -774,26 +774,77 @@ async function canvasFetch(canvasPath) {
   return allResults;
 }
 
+async function fetchWithTimeout(url, options, ms) {
+  var controller = new AbortController();
+  var timer = setTimeout(function(){ controller.abort(); }, ms);
+  try {
+    var res = await fetch(url, Object.assign({}, options, { signal: controller.signal }));
+    clearTimeout(timer);
+    return res;
+  } catch(e) {
+    clearTimeout(timer);
+    throw e;
+  }
+}
+
+async function canvasFetchSafe(canvasPath) {
+  // Same as canvasFetch but uses fetchWithTimeout and won't hang
+  var token = getToken();
+  var allResults = [];
+  var currentPath = canvasPath;
+  while(currentPath) {
+    var parts = currentPath.split('?');
+    var pathOnly = parts[0];
+    var qs = parts[1] ? '&' + parts[1] : '';
+    var proxyUrl = '/api/canvas?path=' + encodeURIComponent(pathOnly) + '&per_page=50' + qs;
+    var res = await fetchWithTimeout(proxyUrl, {
+      headers: { 'Authorization': 'Bearer ' + token }
+    }, 8000); // 8 second timeout per request
+    var data = await res.json();
+    if(!res.ok) {
+      if(data && data.error) throw new Error(data.error);
+      throw new Error('Canvas error ' + res.status);
+    }
+    if(data && data.error) throw new Error(data.error);
+    if(Array.isArray(data)) allResults = allResults.concat(data);
+    else return data;
+    var link = res.headers.get('Link') || '';
+    var nextMatch = link.match(/<([^>]+)>\s*;\s*rel="next"/);
+    if(nextMatch) {
+      var pathParam = new URL(nextMatch[1], 'http://x').searchParams.get('path');
+      currentPath = pathParam || null;
+    } else {
+      currentPath = null;
+    }
+  }
+  return allResults;
+}
+
 async function syncCanvas() {
   var token = getToken();
   if(!token) { setCanvasStatus('Paste your Canvas token above first.', 'err'); return; }
   var btn = document.getElementById('canvas-sync-btn');
   btn.textContent = 'Syncing...'; btn.disabled = true;
-  setCanvasStatus('Connecting to Canvas...', 'loading');
+
   try {
-    // fetch active courses
-    var courses = await canvasFetch('/api/v1/courses?enrollment_state=active&per_page=50');
+    setCanvasStatus('Step 1 of 2 — fetching your courses...', 'loading');
+    var courses = await canvasFetchSafe('/api/v1/courses?enrollment_state=active&per_page=50');
     courses = courses.filter(function(c){ return c.name && !c.access_restricted_by_date; });
     canvasCourses = courses;
 
-    // fetch upcoming assignments for each course
-    var now = new Date().toISOString();
+    if(!courses.length) {
+      setCanvasStatus('No active courses found. Make sure your token is correct and you have active enrollments.', 'err');
+      btn.textContent = 'Sync from Canvas'; btn.disabled = false;
+      return;
+    }
+
+    setCanvasStatus('Step 2 of 2 — fetching assignments from ' + courses.length + ' courses...', 'loading');
     var allAssigns = [];
-    for(var i=0; i<courses.length; i++) {
+    for(var i = 0; i < courses.length; i++) {
+      setCanvasStatus('Fetching assignments (' + (i+1) + ' / ' + courses.length + ')...', 'loading');
       try {
-        var assigns = await canvasFetch('/api/v1/courses/'+courses[i].id+'/assignments?order_by=due_at&per_page=50&include[]=submission');
+        var assigns = await canvasFetchSafe('/api/v1/courses/'+courses[i].id+'/assignments?order_by=due_at&per_page=50&include[]=submission');
         assigns.forEach(function(a){
-          // Include if: not submitted, and either no due date OR due date is in the future
           var isPastDue = a.due_at && new Date(a.due_at) < new Date();
           var isSubmitted = a.submission && (a.submission.workflow_state === 'submitted' || a.submission.workflow_state === 'graded');
           if(!isSubmitted && !isPastDue) {
@@ -807,15 +858,20 @@ async function syncCanvas() {
             });
           }
         });
-      } catch(e) { /* skip courses we can't read */ }
+      } catch(e) {
+        console.warn('Skipped course', courses[i].name, e.message);
+      }
     }
     canvasPendingAssignments = allAssigns;
-
-    // render course matching UI
     renderCourseMatching(courses);
-    setCanvasStatus('Found ' + allAssigns.length + ' upcoming assignments across ' + courses.length + ' courses. Match courses to subjects below, then click Import.', 'ok');
+
+    if(allAssigns.length === 0) {
+      setCanvasStatus('Connected! Found ' + courses.length + ' courses but no upcoming unsubmitted assignments.', 'ok');
+    } else {
+      setCanvasStatus('Found ' + allAssigns.length + ' upcoming assignments across ' + courses.length + ' courses. Match courses to subjects below, then click Import.', 'ok');
+    }
   } catch(e) {
-    setCanvasStatus(e.message, 'err');
+    setCanvasStatus('Error: ' + e.message, 'err');
   }
   btn.textContent = 'Sync from Canvas'; btn.disabled = false;
 }
