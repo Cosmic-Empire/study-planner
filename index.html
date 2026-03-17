@@ -886,7 +886,9 @@ var canvasLoadedCourses = [];
 
 function openCanvasImportPanel() {
   var token = getToken();
-  if(!token) { alert('Add your Canvas token in Settings first.'); return; }
+  if(!token) {
+    // show panel anyway with a prompt to add token
+  }
   // insert panel after canvas-import-bar if not already there
   var existing = document.getElementById('canvas-panel');
   if(existing) { existing.style.display='block'; existing.scrollIntoView({behavior:'smooth'}); return; }
@@ -1066,11 +1068,10 @@ async function importCoursesAsSubjects() {
 function renderSubjects() {
   var el=document.getElementById('sub-list');
   var token = getToken();
-  var canvasBtnStyle = 'display:block;width:100%;padding:10px;border-radius:10px;font-size:13px;font-weight:500;text-align:center;cursor:pointer;font-family:DM Sans,sans-serif;border:none;margin-top:12px;' + (token ? 'background:#1a1a1a;color:#fff;' : 'background:var(--stat-bg);color:var(--muted);border:1px solid var(--border);cursor:default;');
-  var canvasBar = '<div id="canvas-import-inline">' +
-    '<button onclick="openCanvasImportPanel()" ' + (token?'':'disabled') + ' style="' + canvasBtnStyle + '">' +
-    (token ? '↻ Sync from Canvas' : '↻ Sync from Canvas (add token in Settings first)') +
-    '</button></div>';
+  // Always show the Canvas sync button — handle missing token inside the panel
+  var canvasBar = '<div id="canvas-import-inline" style="margin-top:12px">' +
+    '<button onclick="openCanvasImportPanel()" style="display:block;width:100%;padding:10px;border-radius:10px;font-size:13px;font-weight:500;text-align:center;cursor:pointer;font-family:DM Sans,sans-serif;background:#1a1a1a;color:#fff;border:none;">↻ Sync from Canvas</button>' +
+    '</div>';
   if(!subjects.length) {
     el.innerHTML = '<div class="empty-state">' +
       '<div class="empty-state-icon"><svg width="22" height="22" viewBox="0 0 16 16" fill="currentColor" style="color:var(--muted)"><rect x="2" y="2" width="12" height="2" rx="1"/><rect x="2" y="7" width="8" height="2" rx="1"/><rect x="2" y="12" width="10" height="2" rx="1"/></svg></div>' +
@@ -1078,7 +1079,7 @@ function renderSubjects() {
       '<div class="empty-state-sub">Create a subject manually or import your courses straight from Canvas.</div>' +
       '<div class="empty-state-actions">' +
         '<button class="btn btn-primary" onclick="showAddSubjectForm()">+ Create subject</button>' +
-        '<button class="btn" onclick="openCanvasImportPanel()" ' + (token?'':'disabled title="Add your Canvas token in Settings first"') + '>Sync from Canvas</button>' +
+        '<button class="btn" onclick="openCanvasImportPanel()">Sync from Canvas</button>' +
       '</div>' +
     '</div>' + canvasBar;
     return;
