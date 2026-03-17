@@ -576,8 +576,11 @@ var tutTotal = 5;
 
 function replayTutorial() {
   localStorage.removeItem('sp_tutorial_done');
-  tutStep=0; renderTutorial();
-  document.getElementById('tutorial-overlay').style.display='flex';
+  tutStep = 0;
+  var overlay = document.getElementById('tutorial-overlay');
+  // Make sure all steps are in DOM before trying to show
+  overlay.style.display = 'flex';
+  renderTutorial();
 }
 
 function initTutorial() {
@@ -787,11 +790,11 @@ async function importCoursesAsSubjects() {
     var assigns = [];
     try {
       assigns = await canvasFetchSafe('/api/v1/courses/'+course.id+'/assignments?order_by=due_at&per_page=50');
+      console.log('Course:', course.name, '— got', assigns.length, 'assignments raw');
     } catch(e) {
       console.warn('Skipped assignments for', course.name, '—', e.message);
-      el.textContent='Skipped assignments for '+course.name+' (timed out) — moving on...';
-      // brief pause so user can read the message
-      await new Promise(function(r){ setTimeout(r, 800); });
+      el.textContent='Skipped assignments for '+course.name+' — moving on...';
+      await new Promise(function(r){ setTimeout(r, 600); });
     }
 
     assigns.forEach(function(a){
