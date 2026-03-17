@@ -791,9 +791,12 @@ async function syncCanvas() {
     var allAssigns = [];
     for(var i=0; i<courses.length; i++) {
       try {
-        var assigns = await canvasFetch('/api/v1/courses/'+courses[i].id+'/assignments?bucket=upcoming&per_page=50&order_by=due_at');
+        var assigns = await canvasFetch('/api/v1/courses/'+courses[i].id+'/assignments?order_by=due_at&per_page=50&include[]=submission');
         assigns.forEach(function(a){
-          if(a.due_at) {
+          // Include if: not submitted, and either no due date OR due date is in the future
+          var isPastDue = a.due_at && new Date(a.due_at) < new Date();
+          var isSubmitted = a.submission && (a.submission.workflow_state === 'submitted' || a.submission.workflow_state === 'graded');
+          if(!isSubmitted && !isPastDue) {
             allAssigns.push({
               canvasId: a.id,
               title: a.name,
