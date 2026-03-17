@@ -738,23 +738,36 @@ function renderSettings() {
 async function canvasFetch(path) {
   var token = getToken();
   if(!token) throw new Error('No token — paste your Canvas API token first.');
-  var url = CANVAS_URL + path;
+  // Route through our Vercel proxy to avoid CORS issues
+  // /api/v1/courses?foo=bar  =>  /api/canvas/api/v1/courses?foo=bar
   var allResults = [];
-  while(url) {
-    var res = await fetch(url, {
-      headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }
+  var nextPath = path;
+  while(nextPath) {
+    // Split path and query string
+    var parts = nextPath.split('?');
+    var pathPart = parts[0].replace(/^\//, '');
+    var query = parts[1] ? '&' + parts[1] : '';
+    var proxyUrl = '/api/canvas/' + pathPart + '?per_page=50' + query;
+    var res = await fetch(proxyUrl, {
+      headers: { 'Authorization': 'Bearer ' + token }
     });
     if(!res.ok) {
       if(res.status === 401) throw new Error('Invalid token — check your Canvas API token and try again.');
       throw new Error('Canvas error ' + res.status + '. Make sure your token is correct.');
     }
     var data = await res.json();
+    if(data.error) throw new Error(data.error);
     if(Array.isArray(data)) allResults = allResults.concat(data);
     else return data;
-    // handle pagination
+    // handle pagination via Link header
     var link = res.headers.get('Link') || '';
     var next = link.match(/<([^>]+)>;\s*rel="next"/);
-    url = next ? next[1] : null;
+    if(next) {
+      // proxy rewrites Canvas URLs to /api/canvas/... already
+      nextPath = next[1].replace('/api/canvas', '');
+    } else {
+      nextPath = null;
+    }
   }
   return allResults;
 }
