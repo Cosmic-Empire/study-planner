@@ -236,9 +236,8 @@ nav{display:flex;flex-direction:column;gap:3px}
     <div class="page" id="page-subjects">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <div><div class="page-title">Subjects</div><div class="page-sub">Your classes and assignments</div></div>
-        <button class="btn btn-sm" onclick="showAddSubjectForm()" id="add-subject-toggle" style="flex-shrink:0;margin-top:4px">+ New subject</button>
+        <button class="btn btn-sm btn-primary" onclick="showAddSubjectForm()" id="add-subject-toggle" style="flex-shrink:0;margin-top:4px">+ New subject</button>
       </div>
-      <!-- inline add form, hidden by default -->
       <div class="add-form" id="add-subject-form" style="display:none">
         <input id="inp-name" class="inp inp-flex" placeholder="Subject name (e.g. Biology)" onkeydown="if(event.key==='Enter')addSubject()" />
         <div class="color-picker" id="color-picker">
@@ -251,7 +250,7 @@ nav{display:flex;flex-direction:column;gap:3px}
           <div class="color-swatch" data-value="#7F77DD|#EEEDFE|#3C3489|#26215C" style="background:#7F77DD" onclick="selectColor(this)" title="Purple"></div>
         </div>
         <button class="btn btn-primary" onclick="addSubject()">Add</button>
-        <button class="btn" onclick="hideAddSubjectForm()">Cancel</button>
+        <button class="btn" onclick="hideAddSubjectForm()">✕</button>
       </div>
       <div id="sub-list" class="subjects-list"></div>
     </div>
@@ -504,7 +503,7 @@ function assignsHTML(sub) {
     return new Date(a.due)-new Date(b.due);
   });
   var html='<div class="assign-section">';
-  html+='<div class="assign-header-row"><span class="assign-label">Assignments ('+assigns.length+')</span></div>';
+  html+='<div class="assign-header-row"><span class="assign-label">'+(assigns.length?assigns.length+' assignment'+(assigns.length!==1?'s':''):'Assignments')+'</span></div>';
   html+='<div class="assign-add-row">';
   html+='<input id="at-'+sub.id+'" class="inp" style="flex:1;min-width:130px" placeholder="Title" onkeydown="if(event.key===\'Enter\')addAssignment('+sub.id+')" />';
   html+='<input id="ad-'+sub.id+'" type="date" class="inp" style="width:130px" />';
@@ -655,16 +654,15 @@ function openCanvasImportPanel() {
         '<button class="btn btn-sm" onclick="closeCanvasPanel()">Close</button>' +
       '</div>' +
       '<div style="padding:12px 16px">' +
-        '<button class="btn btn-primary btn-sm" onclick="loadCoursesInline()" id="canvas-load-btn">Load my Canvas courses</button>' +
+        '<button class="btn btn-primary btn-sm" onclick="loadCoursesInline()" id="canvas-load-btn">Load courses from Canvas</button>' +
         '<div id="canvas-panel-status" class="canvas-status" style="margin-top:8px"></div>' +
       '</div>' +
       '<div id="canvas-panel-courses" style="display:none">' +
         '<div style="padding:8px 16px;font-size:12px;color:var(--muted);border-top:1px solid var(--border)">Tick the courses to import. A new subject will be created for each one.</div>' +
         '<div id="canvas-panel-list"></div>' +
-        '<div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap">' +
+        '<div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
           '<button class="btn btn-primary btn-sm" onclick="importCoursesAsSubjects()" id="canvas-do-import-btn">Import selected</button>' +
-          '<button class="btn btn-sm" onclick="selectAllInline()">All</button>' +
-          '<button class="btn btn-sm" onclick="selectNoneInline()">None</button>' +
+          '<span style="font-size:12px;color:var(--muted)">Uncheck any courses you want to skip</span>' +
         '</div>' +
         '<div id="canvas-panel-import-status" class="canvas-status" style="margin:0 16px 12px"></div>' +
       '</div>' +
@@ -769,7 +767,7 @@ async function importCoursesAsSubjects() {
 
   for(var i=0;i<selected.length;i++) {
     var course=selected[i];
-    el.textContent='Importing '+course.name+' ('+(i+1)+'/'+selected.length+')...';
+    el.textContent='Fetching '+course.name+' ('+(i+1)+'/'+selected.length+')...';
     el.className='canvas-status loading';
 
     // get chosen color
@@ -777,44 +775,49 @@ async function importCoursesAsSubjects() {
     var cv=swatch?swatch.dataset.value:palette[i%palette.length];
     var c=colorParts(cv);
 
-    // find or create subject
+    // find or create subject — do this BEFORE the fetch so it saves even if fetch fails
     var sub=subjects.find(function(s){ return s.name.toLowerCase()===course.name.toLowerCase(); });
     if(!sub) {
       sub={id:Date.now()+i, name:course.name, mid:c.mid, light:c.light, dark:c.dark, dd:c.dd, studied:0, assigns:[]};
       subjects.push(sub);
+      save(); // save subject immediately so it's not lost if assignments fail
     }
 
-    // fetch assignments
+    // fetch assignments — always continues even on error/timeout
+    var assigns = [];
     try {
-      var assigns=await canvasFetchSafe('/api/v1/courses/'+course.id+'/assignments?order_by=due_at&per_page=50');
-      assigns.forEach(function(a){
-        var isPastDue=a.due_at&&new Date(a.due_at)<new Date();
-        if(isPastDue) return;
-        if(!sub.assigns) sub.assigns=[];
-        var exists=sub.assigns.find(function(ex){ return ex.canvasId===a.id; });
-        if(exists){totalSkipped++;return;}
-        sub.assigns.push({id:Date.now()+totalImported, canvasId:a.id, title:a.name, due:a.due_at?a.due_at.split('T')[0]:'', type:guessType(a.name,a.submission_types), done:false});
-        totalImported++;
-      });
+      assigns = await canvasFetchSafe('/api/v1/courses/'+course.id+'/assignments?order_by=due_at&per_page=50');
     } catch(e) {
-      console.warn('Failed',course.name,e.message);
+      console.warn('Skipped assignments for', course.name, '—', e.message);
+      el.textContent='Skipped assignments for '+course.name+' (timed out) — moving on...';
+      // brief pause so user can read the message
+      await new Promise(function(r){ setTimeout(r, 800); });
     }
-    save();
+
+    assigns.forEach(function(a){
+      var isPastDue=a.due_at&&new Date(a.due_at)<new Date();
+      if(isPastDue) return;
+      if(!sub.assigns) sub.assigns=[];
+      var exists=sub.assigns.find(function(ex){ return ex.canvasId===a.id; });
+      if(exists){totalSkipped++;return;}
+      sub.assigns.push({id:Date.now()+totalImported, canvasId:a.id, title:a.name, due:a.due_at?a.due_at.split('T')[0]:'', type:guessType(a.name,a.submission_types), done:false});
+      totalImported++;
+    });
+    save(); // save after each course
   }
 
   renderAll();
-  el.textContent='Done! Created/updated '+selected.length+' subjects and imported '+totalImported+' assignments'+(totalSkipped?' ('+totalSkipped+' already existed).':'.');
+  el.textContent='Done! Imported '+selected.length+' subjects and '+totalImported+' assignments'+(totalSkipped?' ('+totalSkipped+' already existed).':'.');
   el.className='canvas-status ok';
   btn.textContent='Import selected'; btn.disabled=false;
 }
 function renderSubjects() {
   var el=document.getElementById('sub-list');
   var token = getToken();
-  var canvasBar = '<div class="canvas-import-bar" id="canvas-import-inline">' +
-    '<div class="canvas-import-bar-text"><strong>Import from Canvas</strong> — pull your courses and assignments automatically' +
-    (token ? '' : ' <span style="color:var(--muted)">(add your token in Settings first)</span>') + '</div>' +
-    '<button class="btn btn-sm btn-primary" onclick="openCanvasImportPanel()" ' + (token?'':'disabled title="Add your Canvas token in Settings first"') + '>Sync Canvas</button>' +
-    '</div>';
+  var canvasBar = '<div id="canvas-import-inline" style="display:flex;justify-content:flex-end;margin-top:4px">' +
+    '<button class="btn btn-sm" onclick="openCanvasImportPanel()" ' + (token?'':'disabled title="Add your Canvas token in Settings first"') + ' style="font-size:12px;color:var(--muted)">' +
+    (token ? '↻ Sync from Canvas' : '↻ Sync from Canvas (add token in Settings)') +
+    '</button></div>';
   if(!subjects.length) {
     el.innerHTML = '<div class="empty-state">' +
       '<div class="empty-state-icon"><svg width="22" height="22" viewBox="0 0 16 16" fill="currentColor" style="color:var(--muted)"><rect x="2" y="2" width="12" height="2" rx="1"/><rect x="2" y="7" width="8" height="2" rx="1"/><rect x="2" y="12" width="10" height="2" rx="1"/></svg></div>' +
@@ -1054,50 +1057,18 @@ async function canvasFetch(canvasPath) {
   return allResults;
 }
 
-async function fetchWithTimeout(url, options, ms) {
-  var controller = new AbortController();
-  var timer = setTimeout(function(){ controller.abort(); }, ms);
-  try {
-    var res = await fetch(url, Object.assign({}, options, { signal: controller.signal }));
-    clearTimeout(timer);
-    return res;
-  } catch(e) {
-    clearTimeout(timer);
-    throw e;
-  }
-}
-
 async function canvasFetchSafe(canvasPath) {
-  // Same as canvasFetch but uses fetchWithTimeout and won't hang
   var token = getToken();
-  var allResults = [];
-  var currentPath = canvasPath;
-  while(currentPath) {
-    var parts = currentPath.split('?');
-    var pathOnly = parts[0];
-    var qs = parts[1] ? '&' + parts[1] : '';
-    var proxyUrl = '/api/canvas?path=' + encodeURIComponent(pathOnly) + '&per_page=50' + qs;
-    var res = await fetchWithTimeout(proxyUrl, {
-      headers: { 'Authorization': 'Bearer ' + token }
-    }, 15000); // 15 second timeout per request
-    var data = await res.json();
-    if(!res.ok) {
-      if(data && data.error) throw new Error(data.error);
-      throw new Error('Canvas error ' + res.status);
-    }
-    if(data && data.error) throw new Error(data.error);
-    if(Array.isArray(data)) allResults = allResults.concat(data);
-    else return data;
-    var link = res.headers.get('Link') || '';
-    var nextMatch = link.match(/<([^>]+)>\s*;\s*rel="next"/);
-    if(nextMatch) {
-      var pathParam = new URL(nextMatch[1], 'http://x').searchParams.get('path');
-      currentPath = pathParam || null;
-    } else {
-      currentPath = null;
-    }
-  }
-  return allResults;
+  var parts = canvasPath.split('?');
+  var pathOnly = parts[0];
+  var qs = parts[1] ? '&' + parts[1] : '';
+  var proxyUrl = '/api/canvas?path=' + encodeURIComponent(pathOnly) + '&per_page=50' + qs;
+  // Proxy handles timeout server-side and returns [] on abort — no client hang
+  var res = await fetch(proxyUrl, { headers: { 'Authorization': 'Bearer ' + token } });
+  if(res.status === 401) throw new Error('Invalid token — check Settings');
+  var data = await res.json();
+  if(data && data.error) throw new Error(data.error);
+  return Array.isArray(data) ? data : [];
 }
 
 /* loadCourses moved to inline canvas panel */
