@@ -735,38 +735,40 @@ function renderSettings() {
   if(tokenEl) tokenEl.value = getToken();
 }
 
-async function canvasFetch(path) {
+async function canvasFetch(canvasPath) {
   var token = getToken();
   if(!token) throw new Error('No token — paste your Canvas API token first.');
-  // Route through our Vercel proxy to avoid CORS issues
-  // /api/v1/courses?foo=bar  =>  /api/canvas/api/v1/courses?foo=bar
   var allResults = [];
-  var nextPath = path;
-  while(nextPath) {
-    // Split path and query string
-    var parts = nextPath.split('?');
-    var pathPart = parts[0].replace(/^\//, '');
-    var query = parts[1] ? '&' + parts[1] : '';
-    var proxyUrl = '/api/canvas/' + pathPart + '?per_page=50' + query;
+  // Start with the given path, then follow pagination
+  var currentPath = canvasPath;
+  while(currentPath) {
+    // Build proxy URL: /api/canvas?path=/api/v1/...&per_page=50&...
+    var parts = currentPath.split('?');
+    var pathOnly = parts[0];
+    var qs = parts[1] ? '&' + parts[1] : '';
+    var proxyUrl = '/api/canvas?path=' + encodeURIComponent(pathOnly) + '&per_page=50' + qs;
     var res = await fetch(proxyUrl, {
       headers: { 'Authorization': 'Bearer ' + token }
     });
+    var data = await res.json();
     if(!res.ok) {
       if(res.status === 401) throw new Error('Invalid token — check your Canvas API token and try again.');
-      throw new Error('Canvas error ' + res.status + '. Make sure your token is correct.');
+      if(data && data.error) throw new Error(data.error);
+      throw new Error('Canvas error ' + res.status);
     }
-    var data = await res.json();
-    if(data.error) throw new Error(data.error);
+    if(data && data.error) throw new Error(data.error);
     if(Array.isArray(data)) allResults = allResults.concat(data);
     else return data;
-    // handle pagination via Link header
+    // Follow pagination: proxy rewrites Link header to /api/canvas?path=...
     var link = res.headers.get('Link') || '';
-    var next = link.match(/<([^>]+)>;\s*rel="next"/);
-    if(next) {
-      // proxy rewrites Canvas URLs to /api/canvas/... already
-      nextPath = next[1].replace('/api/canvas', '');
+    var nextMatch = link.match(/<([^>]+)>\s*;\s*rel="next"/);
+    if(nextMatch) {
+      // Extract the path param from the proxy URL in the Link header
+      var nextProxyUrl = nextMatch[1];
+      var pathParam = new URL(nextProxyUrl, 'http://x').searchParams.get('path');
+      currentPath = pathParam || null;
     } else {
-      nextPath = null;
+      currentPath = null;
     }
   }
   return allResults;
