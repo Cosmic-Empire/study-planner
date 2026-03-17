@@ -187,6 +187,167 @@ nav{display:flex;flex-direction:column;gap:3px}
 .empty{font-size:13px;color:var(--faint);text-align:center;padding:2rem 0}
 .cdot{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle;margin-right:5px;flex-shrink:0}
 .section-label{font-size:13px;font-weight:500;margin-bottom:6px;color:var(--text)}
+
+/* ─────────────────────────────────────────
+   MOBILE  (≤ 768px)
+───────────────────────────────────────── */
+@media (max-width: 768px) {
+
+  body {
+    padding: 0;
+    align-items: stretch;
+    background: var(--bg);
+  }
+
+  /* Full-screen app, no card chrome */
+  .app {
+    display: flex;
+    flex-direction: column;
+    grid-template-columns: unset;
+    max-width: 100%;
+    min-height: 100vh;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  /* Hide desktop sidebar */
+  .sidebar { display: none; }
+
+  /* Main content fills screen above bottom nav */
+  .main {
+    padding: 1rem 1rem 5rem;
+    max-height: unset;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  /* ── Bottom nav bar ── */
+  .mobile-nav {
+    display: flex !important;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 60px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    z-index: 500;
+    padding: 0 4px;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .mobile-nav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 10px;
+    padding: 6px 4px;
+    border-radius: 8px;
+    transition: color 0.12s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mobile-nav-btn.active { color: var(--text); }
+  .mobile-nav-btn svg { width: 20px; height: 20px; opacity: 0.5; }
+  .mobile-nav-btn.active svg { opacity: 1; }
+
+  /* ── Stat grid stacks to 2 cols ── */
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+
+  /* ── Bigger checkboxes ── */
+  .assign-cb {
+    width: 22px !important;
+    height: 22px !important;
+    min-width: 22px;
+    cursor: pointer;
+  }
+
+  /* ── Bigger tap targets on assignment items ── */
+  .assign-item {
+    padding: 11px 12px;
+    gap: 10px;
+    position: relative;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* Swipe-to-delete: red background revealed on swipe */
+  .assign-item::after {
+    content: 'Delete';
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    width: 80px;
+    background: #e24b4a;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0 8px 8px 0;
+    opacity: 0;
+    transition: opacity 0.15s;
+    pointer-events: none;
+  }
+  .assign-item.swiping::after { opacity: 1; }
+  .assign-item-inner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    transition: transform 0.2s ease;
+    will-change: transform;
+  }
+
+  /* Hide the × delete button on mobile — swipe handles it */
+  .assign-del { display: none; }
+
+  /* ── Add form stacks vertically ── */
+  .add-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .add-form .inp-flex { min-width: unset; }
+  .add-form .btn { width: 100%; justify-content: center; }
+
+  /* ── Assignment add row stacks ── */
+  .assign-add-row {
+    flex-direction: column;
+  }
+  .assign-add-row .inp,
+  .assign-add-row select,
+  .assign-add-row button {
+    width: 100% !important;
+    min-width: unset !important;
+  }
+
+  /* ── Subject header wraps ── */
+  .subject-header { flex-wrap: wrap; gap: 8px; }
+
+  /* ── Progress rows adjust ── */
+  .prog-row { grid-template-columns: 100px 1fr 32px; gap: 8px; }
+
+  /* ── Settings rows stack on very small screens ── */
+  .settings-row { flex-wrap: wrap; gap: 10px; }
+
+  /* ── Timer ring scales down ── */
+  .timer-ring { width: 160px; height: 160px; }
+  .timer-ring svg { width: 160px; height: 160px; }
+  .ttime { font-size: 28px; }
+
+  /* ── Page title spacing ── */
+  .page-title { font-size: 20px; }
+
+  /* ── Canvas panel full width ── */
+  .canvas-course-row { flex-wrap: wrap; gap: 8px; }
+}
+
+/* Hide mobile nav on desktop */
+.mobile-nav { display: none; }
 </style>
 </head>
 <body>
@@ -371,6 +532,30 @@ nav{display:flex;flex-direction:column;gap:3px}
 
   </div>
 </div>
+
+<!-- Mobile bottom nav -->
+<nav class="mobile-nav" id="mobile-nav">
+  <button class="mobile-nav-btn active" data-page="dashboard" onclick="showPage(this);syncMobileNav(this)">
+    <svg viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
+    Home
+  </button>
+  <button class="mobile-nav-btn" data-page="subjects" onclick="showPage(this);syncMobileNav(this)">
+    <svg viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="12" height="2" rx="1"/><rect x="2" y="7" width="8" height="2" rx="1"/><rect x="2" y="12" width="10" height="2" rx="1"/></svg>
+    Subjects
+  </button>
+  <button class="mobile-nav-btn" data-page="timer" onclick="showPage(this);syncMobileNav(this)">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="9" r="6"/><path d="M8 6v3l2 1"/><path d="M6 1h4"/></svg>
+    Timer
+  </button>
+  <button class="mobile-nav-btn" data-page="progress" onclick="showPage(this);syncMobileNav(this)">
+    <svg viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="10" width="3" height="5" rx="1"/><rect x="6" y="6" width="3" height="9" rx="1"/><rect x="11" y="2" width="3" height="13" rx="1"/></svg>
+    Progress
+  </button>
+  <button class="mobile-nav-btn" data-page="settings" onclick="showPage(this);syncMobileNav(this)">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M2.93 2.93l1.41 1.41M11.66 11.66l1.41 1.41M2.93 13.07l1.41-1.41M11.66 4.34l1.41-1.41"/></svg>
+    Settings
+  </button>
+</nav>
 
 <!-- Tutorial overlay -->
 <div class="tutorial-overlay" id="tutorial-overlay" style="display:none">
@@ -1131,3 +1316,78 @@ try { renderAll(); } catch(e) { console.error('renderAll error:', e); }
 if(document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', function(){ try { initTutorial(); } catch(e){ console.error('tutorial error:',e); } });
 } else {
+  try { initTutorial(); } catch(e) { console.error('tutorial error:', e); }
+}
+/* ── Mobile nav sync ── */
+function syncMobileNav(activeBtn) {
+  document.querySelectorAll('.mobile-nav-btn').forEach(function(b){ b.classList.remove('active'); });
+  // match by data-page
+  var page = activeBtn.dataset.page;
+  document.querySelectorAll('.mobile-nav-btn[data-page="'+page+'"]').forEach(function(b){ b.classList.add('active'); });
+}
+
+/* ── Swipe to delete assignments ── */
+function initSwipeToDelete() {
+  var items = document.querySelectorAll('.assign-item:not(.swipe-init)');
+  items.forEach(function(item) {
+    item.classList.add('swipe-init');
+
+    // Wrap inner content in .assign-item-inner if not already
+    if(!item.querySelector('.assign-item-inner')) {
+      var inner = document.createElement('div');
+      inner.className = 'assign-item-inner';
+      while(item.firstChild) inner.appendChild(item.firstChild);
+      item.appendChild(inner);
+    }
+
+    var inner = item.querySelector('.assign-item-inner');
+    var startX = 0, currentX = 0, isDragging = false;
+    var threshold = 80;
+
+    item.addEventListener('touchstart', function(e) {
+      startX = e.touches[0].clientX;
+      currentX = 0;
+      isDragging = true;
+    }, {passive: true});
+
+    item.addEventListener('touchmove', function(e) {
+      if(!isDragging) return;
+      var dx = e.touches[0].clientX - startX;
+      if(dx > 0) return; // only allow left swipe
+      currentX = dx;
+      var clamped = Math.max(dx, -threshold);
+      inner.style.transform = 'translateX(' + clamped + 'px)';
+      item.classList.toggle('swiping', dx < -30);
+    }, {passive: true});
+
+    item.addEventListener('touchend', function() {
+      isDragging = false;
+      if(currentX < -threshold * 0.75) {
+        // Trigger delete
+        inner.style.transform = 'translateX(-100%)';
+        item.style.opacity = '0';
+        item.style.transition = 'opacity 0.2s';
+        setTimeout(function() {
+          // Find the delete button and click it
+          var delBtn = item.querySelector('.assign-del');
+          if(delBtn) delBtn.click();
+        }, 200);
+      } else {
+        // Snap back
+        inner.style.transform = '';
+        item.classList.remove('swiping');
+      }
+    }, {passive: true});
+  });
+}
+
+/* Re-run swipe init after every renderAll since DOM gets rebuilt */
+var _origRenderAll = renderAll;
+function renderAll() {
+  _origRenderAll();
+  setTimeout(initSwipeToDelete, 50);
+}
+
+</script>
+</body>
+</html>
