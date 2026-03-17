@@ -799,7 +799,7 @@ async function canvasFetchSafe(canvasPath) {
     var proxyUrl = '/api/canvas?path=' + encodeURIComponent(pathOnly) + '&per_page=50' + qs;
     var res = await fetchWithTimeout(proxyUrl, {
       headers: { 'Authorization': 'Bearer ' + token }
-    }, 8000); // 8 second timeout per request
+    }, 15000); // 15 second timeout per request
     var data = await res.json();
     if(!res.ok) {
       if(data && data.error) throw new Error(data.error);
@@ -843,11 +843,10 @@ async function syncCanvas() {
     for(var i = 0; i < courses.length; i++) {
       setCanvasStatus('Fetching assignments (' + (i+1) + ' / ' + courses.length + ')...', 'loading');
       try {
-        var assigns = await canvasFetchSafe('/api/v1/courses/'+courses[i].id+'/assignments?order_by=due_at&per_page=50&include[]=submission');
+        var assigns = await canvasFetchSafe('/api/v1/courses/'+courses[i].id+'/assignments?order_by=due_at&per_page=50');
         assigns.forEach(function(a){
           var isPastDue = a.due_at && new Date(a.due_at) < new Date();
-          var isSubmitted = a.submission && (a.submission.workflow_state === 'submitted' || a.submission.workflow_state === 'graded');
-          if(!isSubmitted && !isPastDue) {
+          if(!isPastDue) {
             allAssigns.push({
               canvasId: a.id,
               title: a.name,
