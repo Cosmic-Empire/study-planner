@@ -14,9 +14,9 @@ export default async function handler(req, res) {
   const params = new URLSearchParams(rest);
   const fullUrl = CANVAS_BASE + path + (params.toString() ? '?' + params.toString() : '');
 
-  // Hard 8s timeout on the Canvas fetch itself — Vercel free plan kills at 10s
+  // Single abort controller covers BOTH the fetch AND the body read
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
+  const timer = setTimeout(() => controller.abort(), 7000);
 
   try {
     const canvasRes = await fetch(fullUrl, {
@@ -26,25 +26,27 @@ export default async function handler(req, res) {
         'Accept': 'application/json',
       },
     });
+
+    // Read body with same signal — this is the key fix
+    // If body read takes too long, abort fires and we return []
+    const text = await canvasRes.text();
     clearTimeout(timer);
 
-    const text = await canvasRes.text();
     let data;
     try { data = JSON.parse(text); }
-    catch(e) { return res.status(500).json({ error: 'Canvas returned non-JSON: ' + text.slice(0, 300) }); }
+    catch(e) { return res.status(200).json([]); }
 
-    const linkHeader = canvasRes.headers.get('Link');
-    if (linkHeader) {
-      res.setHeader('Link', linkHeader.replace(/https:\/\/sdhc\.instructure\.com(\/api\/v1\/[^>]*)/g, '/api/canvas?path=$1'));
+    if (!canvasRes.ok) {
+      return res.status(canvasRes.status).json(
+        typeof data === 'object' ? data : { error: 'Canvas error ' + canvasRes.status }
+      );
     }
 
-    return res.status(canvasRes.status).json(data);
+    return res.status(200).json(Array.isArray(data) ? data : data);
+
   } catch (err) {
     clearTimeout(timer);
-    if (err.name === 'AbortError') {
-      // Return empty array instead of hanging — client treats this as "no assignments"
-      return res.status(200).json([]);
-    }
-    return res.status(500).json({ error: 'Proxy error: ' + err.message });
+    // AbortError = timeout — return empty array so client never hangs
+    return res.status(200).json([]);
   }
 }
