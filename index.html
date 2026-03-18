@@ -1068,10 +1068,9 @@ async function importCoursesAsSubjects() {
       sub.assigns.push({id:Date.now()+totalImported, canvasId:a.id, title:a.name, due:a.due_at?a.due_at.split('T')[0]:'', type:guessType(a.name,a.submission_types), done:false});
       totalImported++;
     });
-    save(); // save after each course
+    save();
+    renderAll(); // show subjects as they import, not just at the end
   }
-
-  renderAll();
   el.textContent='Done! Imported '+selected.length+' subjects and '+totalImported+' assignments'+(totalSkipped?' ('+totalSkipped+' already existed).':'.');
   el.className='canvas-status ok';
   btn.textContent='Import selected'; btn.disabled=false;
@@ -1320,12 +1319,24 @@ async function canvasFetchSafe(canvasPath) {
   var pathOnly = parts[0];
   var qs = parts[1] ? '&' + parts[1] : '';
   var proxyUrl = '/api/canvas?path=' + encodeURIComponent(pathOnly) + '&per_page=50' + qs;
-  // Proxy handles timeout server-side and returns [] on abort — no client hang
-  var res = await fetch(proxyUrl, { headers: { 'Authorization': 'Bearer ' + token } });
-  if(res.status === 401) throw new Error('Invalid token — check Settings');
-  var data = await res.json();
-  if(data && data.error) throw new Error(data.error);
-  return Array.isArray(data) ? data : [];
+  // Hard 12s client-side timeout — no matter what, we move on
+  var controller = new AbortController();
+  var timer = setTimeout(function(){ controller.abort(); }, 12000);
+  try {
+    var res = await fetch(proxyUrl, {
+      headers: { 'Authorization': 'Bearer ' + token },
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+    if(res.status === 401) throw new Error('Invalid token — check Settings');
+    var data = await res.json();
+    if(data && data.error) throw new Error(data.error);
+    return Array.isArray(data) ? data : [];
+  } catch(e) {
+    clearTimeout(timer);
+    if(e.name === 'AbortError') return []; // timed out — return empty, move on
+    throw e;
+  }
 }
 
 /* loadCourses moved to inline canvas panel */
